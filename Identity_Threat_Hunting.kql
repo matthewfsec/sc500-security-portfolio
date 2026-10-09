@@ -1,0 +1,14 @@
+// Title: Detect Potential MFA Fatigue / Spraying Attacks
+// Description: Queries SigninLogs for multiple failed MFA challenges followed by a success.
+SigninLogs
+| where TimeGenerated > ago(24h)
+| where ResultType in ("50074", "50076") // Codes for MFA challenge required/failed
+| summarize FailedMFACount = count() by UserPrincipalName, IPAddress, Location
+| where FailedMFACount >= 3
+| join kind=inner (
+    SigninLogs
+    | where TimeGenerated > ago(24h)
+    | where ResultType == "0" // Code for successful sign-in
+    | project UserPrincipalName, SuccessfulIP = IPAddress, SuccessTime = TimeGenerated
+) on UserPrincipalName
+| project SuccessTime, UserPrincipalName, IPAddress, FailedMFACount, SuccessfulIP
